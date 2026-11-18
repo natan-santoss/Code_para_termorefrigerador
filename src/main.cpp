@@ -113,7 +113,7 @@ public:
     desligar();
   }
   void direcionar(int angulo) {
-    if (angulo != anguloAtual) {           // so mexe se mudou
+    if (angulo != anguloAtual) {           
       servo.write(angulo);
       anguloAtual = angulo;
     }
@@ -164,9 +164,13 @@ public:
 class Teclado {
   Keypad *customKeypad = nullptr;
   FilaEventos *fila = nullptr;
-  char teclasPressionada[3] = "";          
+  char teclasPressionada[3] = "";
   uint8_t teclas_armazenadas = 0;
-  bool resetEnviado = false;
+
+  // controle do duplo *
+  bool asteriscoEsperando = false;          // já apertaram um * e estamos esperando o segundo?
+  unsigned long horaDoAsterisco = 0;        // quando o primeiro * foi apertado
+  const unsigned long TEMPO_DUPLO = 400;    // ms para o segundo * contar como reset
 
   void enviar(TipoEvento tipo, char tecla = 0) {
     Evento e{};
@@ -174,6 +178,7 @@ class Teclado {
     e.tecla = tecla;
     fila->enqueue(e);
   }
+
 public:
   void iniciar(byte *linhas, byte *colunas, FilaEventos *f) {
     customKeypad = new Keypad(makeKeymap(keys), linhas, colunas, KEYBOARD_ROWS, KEYBOARD_COLS);
@@ -181,33 +186,43 @@ public:
     limpar();
   }
 
-  // Chamado em loop pela keypadTask.
-  // Tecla e enviada quando SOLTA; # e * apertadas juntas -> EV_RESET.
   char lerTecla() {
     char ultima = NO_KEY;
+
+    // passou o tempo sem segundo *: vale como * normal
+    if (asteriscoEsperando && millis() - horaDoAsterisco > TEMPO_DUPLO) {
+      asteriscoEsperando = false;
+      enviar(EV_TECLA, '*');
+      ultima = '*';
+    }
+
     if (!customKeypad->getKeys()) return ultima;
 
-    bool hash = false, star = false, algumaApertada = false;
     for (int i = 0; i < LIST_MAX; i++) {
       Key &k = customKeypad->key[i];
-      if (k.kstate == PRESSED || k.kstate == HOLD) {
-        algumaApertada = true;
-        if (k.kchar == '#') hash = true;
-        if (k.kchar == '*') star = true;
+      if (!(k.stateChanged && k.kstate == RELEASED)) continue;
+
+      if (k.kchar == '*') {
+        if (asteriscoEsperando) {
+          // segundo * a tempo: reset
+          asteriscoEsperando = false;
+          enviar(EV_RESET);
+        } else {
+          // primeiro *: espera pra ver se vem outro
+          asteriscoEsperando = true;
+          horaDoAsterisco = millis();
+        }
+        continue;
       }
-    }
-    if (hash && star && !resetEnviado) {
-      enviar(EV_RESET);
-      resetEnviado = true;
-    }
-    for (int i = 0; i < LIST_MAX; i++) {
-      Key &k = customKeypad->key[i];
-      if (k.stateChanged && k.kstate == RELEASED && !resetEnviado) {
-        enviar(EV_TECLA, k.kchar);
-        ultima = k.kchar;
+
+      // outra tecla: se tinha * esperando, envia ele antes
+      if (asteriscoEsperando) {
+        asteriscoEsperando = false;
+        enviar(EV_TECLA, '*');
       }
+      enviar(EV_TECLA, k.kchar);
+      ultima = k.kchar;
     }
-    if (!algumaApertada) resetEnviado = false;
     return ultima;
   }
 
@@ -217,10 +232,10 @@ public:
   void apagarDigito() {
     if (teclas_armazenadas > 0) teclasPressionada[--teclas_armazenadas] = '\0';
   }
-  int lerValor() {                          
+  int lerValor() {
     return (teclas_armazenadas == 2) ? atoi(teclasPressionada) : -1;
   }
-  int confirmar() {                         
+  int confirmar() {
     int v = lerValor();
     limpar();
     return v;
@@ -232,17 +247,17 @@ public:
 
 class ControleTemperatura {
   float temps[NUM_SENSORES];
-  int temp_goal = 0;
+  int desejada = 0;
   int regiaoAtual = -1;                    
 public:
   void iniciar() {
-    temp_goal = 0;
+    desejada = 0;
     regiaoAtual = -1;
     for (auto &t : temps) t = NAN;
   }
   bool temperaturaValida(int valor) { return valor >= TEMP_MIN && valor <= TEMP_MAX; }
-  void updateGoalTemp(int new_temp_goal) { temp_goal = new_temp_goal; }
-  int  lerDesejada()                { return temp_goal; }
+  void updateGoalTemp(int novadesejada) { desejada = novadesejada; }
+  int  lerDesejada()                { return desejada; }
   void atualizarLeituras(const float *novas) {
     for (int i = 0; i < NUM_SENSORES; i++) temps[i] = novas[i];
   }
@@ -265,7 +280,7 @@ public:
   }
   bool necessitaRefrigeracao() {
     float m = calcularMedia();
-    return !isnan(m) && m > temp_goal;
+    return !isnan(m) && m > desejada;
   }
   
   int calcularAngulo() {
