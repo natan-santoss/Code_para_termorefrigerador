@@ -118,8 +118,8 @@ public:
       anguloAtual = angulo;
     }
   }
-  void ligar()      { ligado = true; }
-  void desligar()   { ligado = false; }
+  void ligar(){ ligado = true; }
+  void desligar() { ligado = false; }
   bool estaLigado() { return ligado; }
 };
 
@@ -128,7 +128,7 @@ class Display {
   LiquidCrystal_I2C lcd{0x27, 20, 4};
 public:
   void iniciar() { lcd.init(); lcd.backlight(); }
-  void limpar()  { lcd.clear(); }
+  void limpar() { lcd.clear(); }
   void piscar(bool ativo) { if (ativo) lcd.blink(); else lcd.noBlink(); }
 
   void perguntarTemperatura() {
@@ -167,7 +167,6 @@ class Teclado {
   char teclasPressionada[3] = "";
   uint8_t teclas_armazenadas = 0;
 
-  // controle do duplo *
   bool asteriscoEsperando = false;          // já apertaram um * e estamos esperando o segundo?
   unsigned long horaDoAsterisco = 0;        // quando o primeiro * foi apertado
   const unsigned long TEMPO_DUPLO = 400;    // ms para o segundo * contar como reset
@@ -189,7 +188,6 @@ public:
   char lerTecla() {
     char ultima = NO_KEY;
 
-    // passou o tempo sem segundo *: vale como * normal
     if (asteriscoEsperando && millis() - horaDoAsterisco > TEMPO_DUPLO) {
       asteriscoEsperando = false;
       enviar(EV_TECLA, '*');
@@ -208,14 +206,11 @@ public:
           asteriscoEsperando = false;
           enviar(EV_RESET);
         } else {
-          // primeiro *: espera pra ver se vem outro
           asteriscoEsperando = true;
           horaDoAsterisco = millis();
         }
         continue;
       }
-
-      // outra tecla: se tinha * esperando, envia ele antes
       if (asteriscoEsperando) {
         asteriscoEsperando = false;
         enviar(EV_TECLA, '*');
@@ -343,17 +338,17 @@ enum Acao : uint8_t {
 Acao matrizAcao[NUM_ESTADOS][NUM_EVENTOS];
 
 void iniciaMatrizAcao(void) {
-  matrizAcao[AGUARDANDO_TEMPERATURA][E_DIGITO]            = A_ADICIONAR_DIGITO;
-  matrizAcao[AGUARDANDO_TEMPERATURA][E_APAGAR]            = A_APAGAR_DIGITO;
+  matrizAcao[AGUARDANDO_TEMPERATURA][E_DIGITO] = A_ADICIONAR_DIGITO;
+  matrizAcao[AGUARDANDO_TEMPERATURA][E_APAGAR]= A_APAGAR_DIGITO;
   matrizAcao[AGUARDANDO_TEMPERATURA][E_CONFIRMA_VALIDO]   = A_REGISTRAR_TEMPERATURA;
   matrizAcao[AGUARDANDO_TEMPERATURA][E_CONFIRMA_INVALIDO] = A_TENTE_DE_NOVO;
-  matrizAcao[AGUARDANDO_TEMPERATURA][E_RESET]             = A_RESETAR;
+  matrizAcao[AGUARDANDO_TEMPERATURA][E_RESET]= A_RESETAR;
 
-  matrizAcao[REFRIGERADOR_DESLIGADO][E_RESET]          = A_RESETAR;
-  matrizAcao[REFRIGERADOR_DESLIGADO][E_LEITURA_NORMAL] = A_ATUALIZAR_MONITORAMENTO;
+  matrizAcao[REFRIGERADOR_DESLIGADO][E_RESET]= A_RESETAR;
+  matrizAcao[REFRIGERADOR_DESLIGADO][E_LEITURA_NORMAL]=A_ATUALIZAR_MONITORAMENTO;
   matrizAcao[REFRIGERADOR_DESLIGADO][E_LEITURA_QUENTE] = A_LIGAR_REFRIGERADOR;
 
-  matrizAcao[REFRIGERADOR_LIGADO][E_RESET]          = A_RESETAR;
+  matrizAcao[REFRIGERADOR_LIGADO][E_RESET] = A_RESETAR;
   matrizAcao[REFRIGERADOR_LIGADO][E_LEITURA_NORMAL] = A_DESLIGAR_REFRIGERADOR;
   matrizAcao[REFRIGERADOR_LIGADO][E_LEITURA_QUENTE] = A_DIRECIONAR_REFRIGERADOR;
 }
@@ -362,23 +357,23 @@ Estado matrizProximoEstado[NUM_ESTADOS][NUM_EVENTOS];
 
 void iniciaMatrizProximoEstado(void) {
   matrizProximoEstado[AGUARDANDO_TEMPERATURA][E_CONFIRMA_VALIDO] = REFRIGERADOR_DESLIGADO;
-  matrizProximoEstado[AGUARDANDO_TEMPERATURA][E_RESET]           = AGUARDANDO_TEMPERATURA;
+  matrizProximoEstado[AGUARDANDO_TEMPERATURA][E_RESET] = AGUARDANDO_TEMPERATURA;
 
-  matrizProximoEstado[REFRIGERADOR_DESLIGADO][E_DIGITO]            = REFRIGERADOR_DESLIGADO;
-  matrizProximoEstado[REFRIGERADOR_DESLIGADO][E_APAGAR]            = REFRIGERADOR_DESLIGADO;
-  matrizProximoEstado[REFRIGERADOR_DESLIGADO][E_CONFIRMA_VALIDO]   = REFRIGERADOR_DESLIGADO;
+  matrizProximoEstado[REFRIGERADOR_DESLIGADO][E_DIGITO] = REFRIGERADOR_DESLIGADO;
+  matrizProximoEstado[REFRIGERADOR_DESLIGADO][E_APAGAR] =REFRIGERADOR_DESLIGADO;
+  matrizProximoEstado[REFRIGERADOR_DESLIGADO][E_CONFIRMA_VALIDO] = REFRIGERADOR_DESLIGADO;
   matrizProximoEstado[REFRIGERADOR_DESLIGADO][E_CONFIRMA_INVALIDO] = REFRIGERADOR_DESLIGADO;
-  matrizProximoEstado[REFRIGERADOR_DESLIGADO][E_RESET]             = AGUARDANDO_TEMPERATURA;
-  matrizProximoEstado[REFRIGERADOR_DESLIGADO][E_LEITURA_NORMAL]    = REFRIGERADOR_DESLIGADO;
-  matrizProximoEstado[REFRIGERADOR_DESLIGADO][E_LEITURA_QUENTE]    = REFRIGERADOR_LIGADO;
+  matrizProximoEstado[REFRIGERADOR_DESLIGADO][E_RESET] = AGUARDANDO_TEMPERATURA;
+  matrizProximoEstado[REFRIGERADOR_DESLIGADO][E_LEITURA_NORMAL] = REFRIGERADOR_DESLIGADO;
+  matrizProximoEstado[REFRIGERADOR_DESLIGADO][E_LEITURA_QUENTE]= REFRIGERADOR_LIGADO;
 
-  matrizProximoEstado[REFRIGERADOR_LIGADO][E_DIGITO]            = REFRIGERADOR_LIGADO;
-  matrizProximoEstado[REFRIGERADOR_LIGADO][E_APAGAR]            = REFRIGERADOR_LIGADO;
-  matrizProximoEstado[REFRIGERADOR_LIGADO][E_CONFIRMA_VALIDO]   = REFRIGERADOR_LIGADO;
+  matrizProximoEstado[REFRIGERADOR_LIGADO][E_DIGITO]= REFRIGERADOR_LIGADO;
+  matrizProximoEstado[REFRIGERADOR_LIGADO][E_APAGAR] = REFRIGERADOR_LIGADO;
+  matrizProximoEstado[REFRIGERADOR_LIGADO][E_CONFIRMA_VALIDO]  = REFRIGERADOR_LIGADO;
   matrizProximoEstado[REFRIGERADOR_LIGADO][E_CONFIRMA_INVALIDO] = REFRIGERADOR_LIGADO;
-  matrizProximoEstado[REFRIGERADOR_LIGADO][E_RESET]             = AGUARDANDO_TEMPERATURA;
-  matrizProximoEstado[REFRIGERADOR_LIGADO][E_LEITURA_NORMAL]    = REFRIGERADOR_DESLIGADO;
-  matrizProximoEstado[REFRIGERADOR_LIGADO][E_LEITURA_QUENTE]    = REFRIGERADOR_LIGADO;
+  matrizProximoEstado[REFRIGERADOR_LIGADO][E_RESET] = AGUARDANDO_TEMPERATURA;
+  matrizProximoEstado[REFRIGERADOR_LIGADO][E_LEITURA_NORMAL] = REFRIGERADOR_DESLIGADO;
+  matrizProximoEstado[REFRIGERADOR_LIGADO][E_LEITURA_QUENTE]  = REFRIGERADOR_LIGADO;
 }
 
 const char *NOME_ESTADO[NUM_ESTADOS] = {"AGUARDANDO_TEMPERATURA", "REFRIGERADOR_DESLIGADO", "REFRIGERADOR_LIGADO"};
@@ -504,7 +499,7 @@ Controlador controlador;
 
 
 void keypadTask(void *) {
-  for (;;) {
+  for (;;) {  // laço infinito
     teclado.lerTecla();
     vTaskDelay(pdMS_TO_TICKS(20));
   }
